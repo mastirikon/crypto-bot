@@ -129,78 +129,45 @@ export class TelegramService implements OnModuleInit {
     // Запускаем обновление цен для всех пользователей
     this.priceUpdateInterval = setInterval(async () => {
       const allUsers = await this.redisService.getAllUsers();
-
+      
       if (allUsers && allUsers.length > 0) {
         for (const userData of allUsers) {
-          if (
-            !userData ||
-            !userData.selectedCryptos ||
-            userData.selectedCryptos.length === 0
-          )
-            continue;
+          if (!userData || !userData.selectedCryptos || userData.selectedCryptos.length === 0) continue;
 
           try {
-            const prices = await this.cryptoService.getCryptoPrices(
-              userData.selectedCryptos,
-            );
+            const prices = await this.cryptoService.getCryptoPrices(userData.selectedCryptos);
             const message = prices
               .map((price) => {
                 const dayEmoji = price.priceChangePercent24h >= 0 ? '🟢' : '🔴';
-                const monthEmoji =
-                  price.priceChangePercent30d >= 0 ? '🟢' : '🔴';
-                const yearEmoji =
-                  price.priceChangePercentYear >= 0 ? '🟢' : '🔴';
-                const allTimeEmoji =
-                  price.priceChangePercentAllTime >= 0 ? '🟢' : '🔴';
+                const monthEmoji = price.priceChangePercent30d >= 0 ? '🟢' : '🔴';
+                const yearEmoji = price.priceChangePercentYear >= 0 ? '🟢' : '🔴';
+                const allTimeEmoji = price.priceChangePercentAllTime >= 0 ? '🟢' : '🔴';
 
                 return `*${price.symbol}*: ${price.price.toFixed(2)}$ | D${dayEmoji}: ${price.priceChangePercent24h.toFixed(1)}% | M${monthEmoji}: ${price.priceChangePercent30d.toFixed(1)}% | Y${yearEmoji}: ${price.priceChangePercentYear.toFixed(1)}% | A${allTimeEmoji}: ${price.priceChangePercentAllTime.toFixed(1)}%`;
               })
               .join('\n');
 
+            // Удаляем предыдущее сообщение, если оно есть
             if (userData.messageId) {
               try {
-                await this.bot.editMessageText(message, {
-                  chat_id: userData.userId,
-                  message_id: userData.messageId,
-                  parse_mode: 'Markdown',
-                });
+                await this.bot.deleteMessage(userData.userId, userData.messageId);
               } catch (error) {
-                if (!error.message.includes('message is not modified')) {
-                  console.error(`Failed to edit message: ${error.message}`);
-                  const sentMessage = await this.bot.sendMessage(
-                    userData.userId,
-                    message,
-                    {
-                      parse_mode: 'Markdown',
-                    },
-                  );
-
-                  // Обновляем информацию о сообщении
-                  await this.redisService.updateUserData(userData.userId, {
-                    messageId: sentMessage.message_id,
-                    date: sentMessage.date,
-                  });
-                }
+                console.error(`Failed to delete message for user ${userData.userId}:`, error.message);
               }
-            } else {
-              const sentMessage = await this.bot.sendMessage(
-                userData.userId,
-                message,
-                {
-                  parse_mode: 'Markdown',
-                },
-              );
-
-              // Обновляем информацию о сообщении
-              await this.redisService.updateUserData(userData.userId, {
-                messageId: sentMessage.message_id,
-                date: sentMessage.date,
-              });
             }
+
+            // Отправляем новое сообщение
+            const sentMessage = await this.bot.sendMessage(userData.userId, message, {
+              parse_mode: 'Markdown',
+            });
+
+            // Обновляем информацию о сообщении
+            await this.redisService.updateUserData(userData.userId, {
+              messageId: sentMessage.message_id,
+              date: sentMessage.date,
+            });
           } catch (error) {
-            console.error(
-              `Error updating prices for user ${userData.userId}: ${error.message}`,
-            );
+            console.error(`Error updating prices for user ${userData.userId}: ${error.message}`);
           }
         }
       }
