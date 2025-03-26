@@ -1,0 +1,30 @@
+version: "3.8"
+
+networks:
+  &app-network ubuntu_network:
+    name: *app-network
+    external: true
+
+x-common-template: &common-template
+  restart: always
+  volumes:
+    - /etc/localtime:/etc/localtime:ro
+  networks:
+    - *app-network
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+
+services:
+  &app-service app:
+    <<: *common-template
+    container_name: *app-service
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+    hostname: *app-service
+    ports:
+      - "3000:3000" 
