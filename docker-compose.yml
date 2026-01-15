@@ -15,7 +15,7 @@ x-common-template: &common-template
     - "host.docker.internal:host-gateway"
 
 services:
-  &app-service app:
+  &app-service crypto-bot:
     <<: *common-template
     container_name: *app-service
     build:
