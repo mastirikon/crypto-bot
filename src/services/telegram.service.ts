@@ -54,22 +54,7 @@ export class TelegramService implements OnModuleInit {
             }
 
             // Отправляем первые данные
-            const prices = await this.cryptoService.getCryptoPrices(
-              userData.selectedCryptos,
-            );
-            const message = prices
-              .map((price) => {
-                const dayEmoji = price.priceChangePercent24h >= 0 ? '🟢' : '🔴';
-                const monthEmoji =
-                  price.priceChangePercent30d >= 0 ? '🟢' : '🔴';
-                const yearEmoji =
-                  price.priceChangePercentYear >= 0 ? '🟢' : '🔴';
-                const allTimeEmoji =
-                  price.priceChangePercentAllTime >= 0 ? '🟢' : '🔴';
-
-                return `*${price.symbol}*: ${price.price.toFixed(2)}$ | D${dayEmoji}: ${price.priceChangePercent24h.toFixed(1)}% | M${monthEmoji}: ${price.priceChangePercent30d.toFixed(1)}% | Y${yearEmoji}: ${price.priceChangePercentYear.toFixed(1)}% | A${allTimeEmoji}: ${price.priceChangePercentAllTime.toFixed(1)}%`;
-              })
-              .join('\n');
+            const message = await this.createMessage(userData.selectedCryptos);
 
             // Отправляем и сохраняем первое сообщение с данными
             const sentMessage = await this.bot.sendMessage(
@@ -140,22 +125,8 @@ export class TelegramService implements OnModuleInit {
             continue;
 
           try {
-            const prices = await this.cryptoService.getCryptoPrices(
-              userData.selectedCryptos,
-            );
-            const message = prices
-              .map((price) => {
-                const dayEmoji = price.priceChangePercent24h >= 0 ? '🟢' : '🔴';
-                const monthEmoji =
-                  price.priceChangePercent30d >= 0 ? '🟢' : '🔴';
-                const yearEmoji =
-                  price.priceChangePercentYear >= 0 ? '🟢' : '🔴';
-                const allTimeEmoji =
-                  price.priceChangePercentAllTime >= 0 ? '🟢' : '🔴';
-
-                return `*${price.symbol}*: ${price.price.toFixed(2)}$ | D${dayEmoji}: ${price.priceChangePercent24h.toFixed(1)}% | M${monthEmoji}: ${price.priceChangePercent30d.toFixed(1)}% | Y${yearEmoji}: ${price.priceChangePercentYear.toFixed(1)}% | A${allTimeEmoji}: ${price.priceChangePercentAllTime.toFixed(1)}%`;
-              })
-              .join('\n');
+            // Отправляем первые данные
+            const message = await this.createMessage(userData.selectedCryptos);
 
             // Удаляем предыдущее сообщение, если оно есть
             if (userData.messageId) {
@@ -309,27 +280,9 @@ export class TelegramService implements OnModuleInit {
 
     await this.bot.sendMessage(userId, `${symbol} добавлен в ваш список`);
 
-    // Отправляем актуальные данные
     try {
-      const prices = await this.cryptoService.getCryptoPrices(updatedCryptos);
-
-      const messageHeader = prices.map((price) => {
-        return `*${price.symbol}*: ${price.price.toFixed(2)}$`;
-      });
-
-      const messageDetails = prices
-        .map((price) => {
-          const dayEmoji = price.priceChangePercent24h >= 0 ? '🟢' : '🔴';
-          const monthEmoji = price.priceChangePercent30d >= 0 ? '🟢' : '🔴';
-          const yearEmoji = price.priceChangePercentYear >= 0 ? '🟢' : '🔴';
-          const allTimeEmoji =
-            price.priceChangePercentAllTime >= 0 ? '🟢' : '🔴';
-
-          return `*${price.symbol}*: ${price.price.toFixed(2)}$ | D${dayEmoji}: ${price.priceChangePercent24h.toFixed(1)}% | M${monthEmoji}: ${price.priceChangePercent30d.toFixed(1)}% | Y${yearEmoji}: ${price.priceChangePercentYear.toFixed(1)}% | A${allTimeEmoji}: ${price.priceChangePercentAllTime.toFixed(1)}%`;
-        })
-        .join('\n');
-
-      const message = messageHeader + `\n\n` + messageDetails;
+      // Отправляем актуальные данные
+      const message = await this.createMessage(userData.selectedCryptos);
 
       const sentMessage = await this.bot.sendMessage(userId, message, {
         parse_mode: 'Markdown',
@@ -345,6 +298,29 @@ export class TelegramService implements OnModuleInit {
         `Error sending price data after adding crypto for user ${userId}: ${error.message}`,
       );
     }
+  }
+
+  async createMessage(updatedCryptos: string[]): Promise<string> {
+    const prices = await this.cryptoService.getCryptoPrices(updatedCryptos);
+
+    const messageHeader = prices
+      .map((price) => {
+        return `*${price.symbol}*: ${price.price.toFixed(2)}$`;
+      })
+      .join('|');
+
+    const messageDetails = prices
+      .map((price) => {
+        const dayEmoji = price.priceChangePercent24h >= 0 ? '🟢' : '🔴';
+        const monthEmoji = price.priceChangePercent30d >= 0 ? '🟢' : '🔴';
+        const yearEmoji = price.priceChangePercentYear >= 0 ? '🟢' : '🔴';
+        const allTimeEmoji = price.priceChangePercentAllTime >= 0 ? '🟢' : '🔴';
+
+        return `*${price.symbol}*: ${price.price.toFixed(2)}$ | D${dayEmoji}: ${price.priceChangePercent24h.toFixed(1)}% | M${monthEmoji}: ${price.priceChangePercent30d.toFixed(1)}% | Y${yearEmoji}: ${price.priceChangePercentYear.toFixed(1)}% | A${allTimeEmoji}: ${price.priceChangePercentAllTime.toFixed(1)}%`;
+      })
+      .join('\n');
+
+    return messageHeader + `\n\n` + messageDetails;
   }
 
   private async handleRemove(msg: TelegramBot.Message, match: RegExpExecArray) {
