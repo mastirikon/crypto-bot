@@ -129,19 +129,29 @@ export class TelegramService implements OnModuleInit {
     // Запускаем обновление цен для всех пользователей
     this.priceUpdateInterval = setInterval(async () => {
       const allUsers = await this.redisService.getAllUsers();
-      
+
       if (allUsers && allUsers.length > 0) {
         for (const userData of allUsers) {
-          if (!userData || !userData.selectedCryptos || userData.selectedCryptos.length === 0) continue;
+          if (
+            !userData ||
+            !userData.selectedCryptos ||
+            userData.selectedCryptos.length === 0
+          )
+            continue;
 
           try {
-            const prices = await this.cryptoService.getCryptoPrices(userData.selectedCryptos);
+            const prices = await this.cryptoService.getCryptoPrices(
+              userData.selectedCryptos,
+            );
             const message = prices
               .map((price) => {
                 const dayEmoji = price.priceChangePercent24h >= 0 ? '🟢' : '🔴';
-                const monthEmoji = price.priceChangePercent30d >= 0 ? '🟢' : '🔴';
-                const yearEmoji = price.priceChangePercentYear >= 0 ? '🟢' : '🔴';
-                const allTimeEmoji = price.priceChangePercentAllTime >= 0 ? '🟢' : '🔴';
+                const monthEmoji =
+                  price.priceChangePercent30d >= 0 ? '🟢' : '🔴';
+                const yearEmoji =
+                  price.priceChangePercentYear >= 0 ? '🟢' : '🔴';
+                const allTimeEmoji =
+                  price.priceChangePercentAllTime >= 0 ? '🟢' : '🔴';
 
                 return `*${price.symbol}*: ${price.price.toFixed(2)}$ | D${dayEmoji}: ${price.priceChangePercent24h.toFixed(1)}% | M${monthEmoji}: ${price.priceChangePercent30d.toFixed(1)}% | Y${yearEmoji}: ${price.priceChangePercentYear.toFixed(1)}% | A${allTimeEmoji}: ${price.priceChangePercentAllTime.toFixed(1)}%`;
               })
@@ -150,16 +160,26 @@ export class TelegramService implements OnModuleInit {
             // Удаляем предыдущее сообщение, если оно есть
             if (userData.messageId) {
               try {
-                await this.bot.deleteMessage(userData.userId, userData.messageId);
+                await this.bot.deleteMessage(
+                  userData.userId,
+                  userData.messageId,
+                );
               } catch (error) {
-                console.error(`Failed to delete message for user ${userData.userId}:`, error.message);
+                console.error(
+                  `Failed to delete message for user ${userData.userId}:`,
+                  error.message,
+                );
               }
             }
 
             // Отправляем новое сообщение
-            const sentMessage = await this.bot.sendMessage(userData.userId, message, {
-              parse_mode: 'Markdown',
-            });
+            const sentMessage = await this.bot.sendMessage(
+              userData.userId,
+              message,
+              {
+                parse_mode: 'Markdown',
+              },
+            );
 
             // Обновляем информацию о сообщении
             await this.redisService.updateUserData(userData.userId, {
@@ -167,7 +187,9 @@ export class TelegramService implements OnModuleInit {
               date: sentMessage.date,
             });
           } catch (error) {
-            console.error(`Error updating prices for user ${userData.userId}: ${error.message}`);
+            console.error(
+              `Error updating prices for user ${userData.userId}: ${error.message}`,
+            );
           }
         }
       }
@@ -290,7 +312,12 @@ export class TelegramService implements OnModuleInit {
     // Отправляем актуальные данные
     try {
       const prices = await this.cryptoService.getCryptoPrices(updatedCryptos);
-      const message = prices
+
+      const messageHeader = prices.map((price) => {
+        return `*${price.symbol}*: ${price.price.toFixed(2)}$`;
+      });
+
+      const messageDetails = prices
         .map((price) => {
           const dayEmoji = price.priceChangePercent24h >= 0 ? '🟢' : '🔴';
           const monthEmoji = price.priceChangePercent30d >= 0 ? '🟢' : '🔴';
@@ -301,6 +328,8 @@ export class TelegramService implements OnModuleInit {
           return `*${price.symbol}*: ${price.price.toFixed(2)}$ | D${dayEmoji}: ${price.priceChangePercent24h.toFixed(1)}% | M${monthEmoji}: ${price.priceChangePercent30d.toFixed(1)}% | Y${yearEmoji}: ${price.priceChangePercentYear.toFixed(1)}% | A${allTimeEmoji}: ${price.priceChangePercentAllTime.toFixed(1)}%`;
         })
         .join('\n');
+
+      const message = messageHeader + `\n\n` + messageDetails;
 
       const sentMessage = await this.bot.sendMessage(userId, message, {
         parse_mode: 'Markdown',
