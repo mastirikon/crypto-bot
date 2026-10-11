@@ -23,8 +23,12 @@ export class TelegramService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
+    const proxy = this.configService.get<string>('TELEGRAM_PROXY');
     const token = this.configService.get<string>('TELEGRAM_BOT_TOKEN');
-    this.bot = new TelegramBot(token, { polling: true });
+    this.bot = new TelegramBot(token, {
+      polling: true,
+      ...(proxy ? { request: { proxy } as any } : {}),
+    });
 
     // Восстанавливаем предпочтения пользователей при запуске
     const allUsers = await this.redisService.getAllUsers();

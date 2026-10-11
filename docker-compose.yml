@@ -1,8 +1,6 @@
-version: "3.8"
-
 networks:
-  &app-network ubuntu_network:
-    name: *app-network
+  ubuntu_network:
+    name: ubuntu_network
     external: true
 
 x-common-template: &common-template
@@ -10,21 +8,67 @@ x-common-template: &common-template
   volumes:
     - /etc/localtime:/etc/localtime:ro
   networks:
-    - *app-network
+    - ubuntu_network
   extra_hosts:
     - "host.docker.internal:host-gateway"
 
 services:
-  &app-service crypto-bot:
+  crypto-bot:
     <<: *common-template
-    container_name: *app-service
-    build:
-      context: .
-      dockerfile: Dockerfile
+    container_name: crypto-bot
+    image: crypto-bot:latest
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - REDIS_HOST=${REDIS_HOST}
-      - REDIS_PORT=${REDIS_PORT}
-    hostname: *app-service
+      - REDIS_HOST=crypto-redis
+      - REDIS_PORT=6379
+      - NODE_ENV=production
+      - NODE_OPTIONS=--max-old-space-size=128
+    hostname: crypto-bot
     ports:
-      - "3000:3000" 
+      - "3000:3000"
+    depends_on:
+      crypto-redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 256M
+        reservations:
+          memory: 128M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  crypto-redis:
+    <<: *common-template
+    container_name: crypto-redis
+    image: redis:7-alpine
+    hostname: crypto-redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - crypto-redis-data:/data
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 128M
+        reservations:
+          memory: 64M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  crypto-redis-data:
